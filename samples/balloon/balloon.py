@@ -19,6 +19,7 @@ import json
 import datetime
 import numpy as np
 import skimage.draw
+from sensor_msgs.msg import Image
 
 # Root directory of the project
 ROOT_DIR = os.path.abspath("../../")
@@ -256,14 +257,18 @@ def detect_and_color_splash(model, image_path=None, video_path=None):
         vwriter.release()
     print("Saved to ", file_name)
 
+global input_image
 
-############################################################
-#  Training
-############################################################
+def input_callback(msg):
+    input_image = msg.data
+    print("got input image!")
+
 
 if __name__ == '__main__':
+
+    global input_image
     rclpy.init()
-    node = rclpy.create_node('minimal_publisher')
+    node = rclpy.create_node('balloon_node')
     
     node.declare_parameter('command')
     node.declare_parameter('dataset')
@@ -291,6 +296,8 @@ if __name__ == '__main__':
     logs = logs_param.value
     image = image_param.value
     video = video_param.value
+
+    topic_subscription = node.create_subscription(Image, 'input_topic', input_callback, 10)
 
     if command == "train":
         assert dataset, "Argument --dataset is required for training"
@@ -353,11 +360,15 @@ if __name__ == '__main__':
     if command == "train":
         train(model)
     elif command == "splash":
-        detect_and_color_splash(model, image_path=image,
+        while rclpy.ok():
+            rclpy.spin_once(node)
+            detect_and_color_splash(model, image_path=image,
                                 video_path=video)
     else:
         print("'{}' is not recognized. "
               "Use 'train' or 'splash'".format(command))
+
+
 
     node.destroy_node()
     rclpy.shutdown()
